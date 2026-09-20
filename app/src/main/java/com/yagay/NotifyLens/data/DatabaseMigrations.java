@@ -29,7 +29,6 @@ public final class DatabaseMigrations {
             db.execSQL("CREATE TABLE IF NOT EXISTS notification_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, instance_id INTEGER NOT NULL, sequence INTEGER NOT NULL, captured_at INTEGER NOT NULL, content_hash TEXT NOT NULL, title TEXT, text TEXT, full_text TEXT, messages_json TEXT, progress INTEGER NOT NULL, progress_max INTEGER NOT NULL, importance INTEGER NOT NULL, source TEXT NOT NULL)");
             db.execSQL("CREATE INDEX IF NOT EXISTS index_notification_revisions_instance_id ON notification_revisions(instance_id)");
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_notification_revisions_instance_id_sequence ON notification_revisions(instance_id, sequence)");
-            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_notification_revisions_instance_id_content_hash ON notification_revisions(instance_id, content_hash)");
 
             db.execSQL("CREATE TABLE IF NOT EXISTS capture_gaps (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, disconnected_at INTEGER NOT NULL, reconnected_at INTEGER NOT NULL, duration_ms INTEGER NOT NULL, reason TEXT)");
 

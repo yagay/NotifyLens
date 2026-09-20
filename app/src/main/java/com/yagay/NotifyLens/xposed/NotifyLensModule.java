@@ -1,20 +1,28 @@
 package com.yagay.NotifyLens.xposed;
 
 import android.app.Dialog;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
 import android.view.View;
 import android.widget.PopupWindow;
 import android.widget.Toast;
 
+import com.yagay.NotifyLens.BuildConfig;
+import com.yagay.NotifyLens.NotifyLensApp;
 import com.yagay.NotifyLens.collector.XposedEventReceiver;
 import com.yagay.NotifyLens.data.EventTypes;
+import com.yagay.NotifyLens.util.HookAuth;
 import com.yagay.NotifyLens.util.TextUtil;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 import java.util.WeakHashMap;
 
 import io.github.libxposed.api.XposedInterface;
@@ -26,8 +34,14 @@ public final class NotifyLensModule extends XposedModule {
     private static final Map<Object, PendingUiEvent> PENDING =
             Collections.synchronizedMap(new WeakHashMap<>());
 
+    private volatile SharedPreferences runtimePrefs;
+
     @Override
     public void onModuleLoaded(XposedModuleInterface.ModuleLoadedParam param) {
+        try {
+            runtimePrefs = getRemotePreferences(NotifyLensApp.REMOTE_GROUP);
+            markHeartbeat(param.getProcessName(), "module");
+        } catch (Throwable ignored) {}
         log(Log.INFO, TAG, "module loaded");
     }
 
@@ -38,6 +52,10 @@ public final class NotifyLensModule extends XposedModule {
         try {
             installFrameworkHooks(pkg);
             installSnackbarHooks(param.getClassLoader(), pkg);
+            if ("com.android.systemui".equals(pkg)) {
+                installHeadsUpHooks(param.getClassLoader());
+            }
+            markHeartbeat(param.getProcessName(), pkg);
             log(Log.INFO, TAG, "enhanced capture ready: " + pkg);
         } catch (Throwable t) {
             log(Log.ERROR, TAG, "hook setup failed: " + pkg, t);
@@ -61,11 +79,11 @@ public final class NotifyLensModule extends XposedModule {
             if (self instanceof Toast) {
                 PendingUiEvent pending = PENDING.remove(self);
                 if (pending != null) {
-                    emit(pending.context, pkg, pending.type, pending.text, pending.className);
+                    emitUi(pending.context, pkg, pending.type, pending.text, pending.className);
                 } else {
                     Toast toast = (Toast) self;
                     View view = toast.getView();
-                    emit(view == null ? null : view.getContext(), pkg, EventTypes.TOAST,
+                    emitUi(view == null ? null : view.getContext(), pkg, EventTypes.TOAST,
                             TextUtil.collectText(view), toast.getClass().getName());
                 }
             }
@@ -78,7 +96,7 @@ public final class NotifyLensModule extends XposedModule {
             if (self instanceof Dialog) {
                 Dialog d = (Dialog) self;
                 View root = d.getWindow() == null ? null : d.getWindow().getDecorView();
-                emit(d.getContext(), pkg, EventTypes.DIALOG, TextUtil.collectText(root), d.getClass().getName());
+                emitUi(d.getContext(), pkg, EventTypes.DIALOG, TextUtil.collectText(root), d.getClass().getName());
             }
             return result;
         });
@@ -89,7 +107,7 @@ public final class NotifyLensModule extends XposedModule {
             if (self instanceof PopupWindow) {
                 PopupWindow p = (PopupWindow) self;
                 View content = p.getContentView();
-                emit(content == null ? null : content.getContext(), pkg, EventTypes.POPUP,
+                emitUi(content == null ? null : content.getContext(), pkg, EventTypes.POPUP,
                         TextUtil.collectText(content), p.getClass().getName());
             }
             return result;
@@ -118,11 +136,31 @@ public final class NotifyLensModule extends XposedModule {
                 Object self = chain.getThisObject();
                 Object result = chain.proceed();
                 PendingUiEvent pending = self == null ? null : PENDING.remove(self);
-                if (pending != null) emit(pending.context, pkg, pending.type, pending.text, pending.className);
+                if (pending != null) emitUi(pending.context, pkg, pending.type, pending.text, pending.className);
                 return result;
             });
-        } catch (Throwable ignored) {
-            // Target app does not use Material Snackbar.
+        } catch (Throwable ignored) {}
+    }
+
+    private void installHeadsUpHooks(ClassLoader cl) {
+        String[] classes = {
+                "com.android.systemui.statusbar.notification.headsup.HeadsUpManagerImpl",
+                "com.android.systemui.statusbar.policy.HeadsUpManager",
+                "com.android.systemui.statusbar.phone.HeadsUpManagerPhone"
+        };
+        for (String name : classes) {
+            try {
+                Class<?> c = Class.forName(name, false, cl);
+                hookNamed(c, "showNotification", chain -> {
+                    Object result = chain.proceed();
+                    Object first = chain.getArgs().isEmpty() ? null : chain.getArg(0);
+                    StatusBarNotification sbn = extractSbn(first);
+                    String key = sbn != null ? sbn.getKey() : extractKey(first);
+                    String pkg = sbn != null ? sbn.getPackageName() : "com.android.systemui";
+                    emitHeadsUp(currentApplicationContext(), pkg, key, c.getName());
+                    return result;
+                });
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -131,13 +169,64 @@ public final class NotifyLensModule extends XposedModule {
             if (!m.getName().equals(name)) continue;
             try {
                 m.setAccessible(true);
-                hook(m)
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept(hooker);
+                hook(m).setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE).intercept(hooker);
             } catch (Throwable t) {
                 log(Log.WARN, TAG, "skip " + clazz.getName() + "#" + name + ": " + t);
             }
         }
+    }
+
+    private void emitUi(Context context, String pkg, String type, String text, String className) {
+        emit(context, pkg, XposedEventReceiver.KIND_UI, type, text, className, "");
+    }
+
+    private void emitHeadsUp(Context context, String pkg, String notificationKey, String className) {
+        if (notificationKey == null || notificationKey.isEmpty()) return;
+        emit(context, pkg, XposedEventReceiver.KIND_HEADS_UP, EventTypes.NOTIFICATION,
+                "", className, notificationKey);
+    }
+
+    private void emit(Context context, String pkg, String kind, String type,
+                      String text, String className, String notificationKey) {
+        if (context == null) return;
+        text = text == null ? "" : text.trim();
+        if (XposedEventReceiver.KIND_UI.equals(kind) && text.isEmpty()) return;
+        try {
+            SharedPreferences prefs = runtimePrefs;
+            String secret = prefs == null ? null : prefs.getString(NotifyLensApp.KEY_SECRET, null);
+            if (secret == null || secret.isEmpty()) return;
+
+            long time = System.currentTimeMillis();
+            String nonce = UUID.randomUUID().toString();
+            String signature = HookAuth.sign(secret, pkg, kind, type, text, className, notificationKey, time, nonce);
+
+            Intent i = new Intent(XposedEventReceiver.ACTION);
+            i.setClassName("com.yagay.NotifyLens", "com.yagay.NotifyLens.collector.XposedEventReceiver");
+            i.putExtra("package", pkg);
+            i.putExtra("kind", kind);
+            i.putExtra("type", type);
+            i.putExtra("text", text);
+            i.putExtra("class", className);
+            i.putExtra("notification_key", notificationKey);
+            i.putExtra("time", time);
+            i.putExtra("nonce", nonce);
+            i.putExtra("signature", signature);
+            context.sendBroadcast(i);
+            markHeartbeat(pkg, pkg);
+        } catch (Throwable ignored) {}
+    }
+
+    private void markHeartbeat(String process, String pkg) {
+        try {
+            SharedPreferences prefs = runtimePrefs;
+            if (prefs == null) return;
+            prefs.edit()
+                    .putLong(NotifyLensApp.KEY_HOOK_HEARTBEAT, System.currentTimeMillis())
+                    .putString(NotifyLensApp.KEY_HOOK_VERSION, BuildConfig.VERSION_NAME)
+                    .putString(NotifyLensApp.KEY_HOOK_PROCESS, process == null ? "" : process)
+                    .putString(NotifyLensApp.KEY_HOOK_PACKAGE, pkg == null ? "" : pkg)
+                    .apply();
+        } catch (Throwable ignored) {}
     }
 
     private static Context argContext(XposedInterface.Chain chain) {
@@ -153,18 +242,43 @@ public final class NotifyLensModule extends XposedModule {
         return null;
     }
 
-    private static void emit(Context context, String pkg, String type, String text, String className) {
-        if (context == null || text == null || text.trim().isEmpty()) return;
+    private static StatusBarNotification extractSbn(Object entry) {
+        if (entry == null) return null;
+        if (entry instanceof StatusBarNotification) return (StatusBarNotification) entry;
+        for (String method : new String[]{"getSbn", "getStatusBarNotification"}) {
+            try {
+                Method m = entry.getClass().getMethod(method);
+                Object value = m.invoke(entry);
+                if (value instanceof StatusBarNotification) return (StatusBarNotification) value;
+            } catch (Throwable ignored) {}
+        }
+        for (String field : new String[]{"mSbn", "sbn"}) {
+            try {
+                Field f = entry.getClass().getDeclaredField(field);
+                f.setAccessible(true);
+                Object value = f.get(entry);
+                if (value instanceof StatusBarNotification) return (StatusBarNotification) value;
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private static String extractKey(Object entry) {
+        if (entry == null) return null;
         try {
-            Intent i = new Intent(XposedEventReceiver.ACTION);
-            i.setClassName("com.yagay.NotifyLens", "com.yagay.NotifyLens.collector.XposedEventReceiver");
-            i.putExtra("package", pkg);
-            i.putExtra("type", type);
-            i.putExtra("text", text.trim());
-            i.putExtra("class", className);
-            i.putExtra("time", System.currentTimeMillis());
-            context.sendBroadcast(i);
-        } catch (Throwable ignored) {}
+            Method m = entry.getClass().getMethod("getKey");
+            Object value = m.invoke(entry);
+            return value == null ? null : value.toString();
+        } catch (Throwable ignored) { return null; }
+    }
+
+    private static Context currentApplicationContext() {
+        try {
+            Class<?> at = Class.forName("android.app.ActivityThread");
+            Method currentApplication = at.getDeclaredMethod("currentApplication");
+            Object app = currentApplication.invoke(null);
+            return app instanceof Context ? ((Context) app).getApplicationContext() : null;
+        } catch (Throwable ignored) { return null; }
     }
 
     private static final class PendingUiEvent {

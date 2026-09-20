@@ -10,8 +10,7 @@ import androidx.room.PrimaryKey;
         tableName = "notification_revisions",
         indices = {
                 @Index(value = {"instance_id"}),
-                @Index(value = {"instance_id", "sequence"}, unique = true),
-                @Index(value = {"instance_id", "content_hash"}, unique = true)
+                @Index(value = {"instance_id", "sequence"}, unique = true)
         }
 )
 public class NotificationRevision {

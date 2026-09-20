@@ -4,10 +4,10 @@ import android.app.Notification;
 import android.app.Person;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.service.notification.StatusBarNotification;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.RemoteViews;
-import android.service.notification.StatusBarNotification;
 
 import com.yagay.NotifyLens.data.EventRecord;
 import com.yagay.NotifyLens.data.EventTypes;
@@ -38,7 +38,7 @@ public final class NotificationParser {
         r.notificationTag = sbn.getTag();
         r.postedAt = sbn.getPostTime();
         r.updatedAt = System.currentTimeMillis();
-        r.eventKey = r.notificationKey + "@" + r.postedAt;
+        r.eventKey = "notification:" + r.notificationKey + "@" + r.postedAt;
 
         r.title = firstNonEmpty(
                 cs(e.getCharSequence(Notification.EXTRA_TITLE_BIG)),
@@ -53,13 +53,21 @@ public final class NotificationParser {
         String lines = joinCharSequences(e.getCharSequenceArray(Notification.EXTRA_TEXT_LINES));
         r.messagesJson = messagesToJson(e);
         String messagesText = messagesToText(e);
-        String remoteText = extractRemoteViewsText(context, r.packageName, n.contentView, n.bigContentView, n.headsUpContentView);
+        r.template = e.getString(Notification.EXTRA_TEMPLATE);
+
+        boolean customRemote = r.template == null && (n.contentView != null || n.bigContentView != null || n.headsUpContentView != null);
+        boolean missingRichText = isBlank(bigText) && isBlank(messagesText) && isBlank(lines);
+        String remoteText = (customRemote || missingRichText)
+                ? extractRemoteViewsText(context, r.packageName, n.contentView, n.bigContentView, n.headsUpContentView)
+                : null;
+
         r.fullText = mergeUseful(bigText, messagesText, lines, remoteText, r.text);
         r.rawExtras = bundleToJson(e).toString();
         r.actionsJson = actionsToJson(n).toString();
 
         r.channelId = n.getChannelId();
         r.groupKey = sbn.getGroupKey();
+        r.groupSummary = (n.flags & Notification.FLAG_GROUP_SUMMARY) != 0;
         r.category = n.category;
         r.flags = n.flags;
         r.ongoing = sbn.isOngoing();
@@ -70,30 +78,39 @@ public final class NotificationParser {
         r.progress = e.getInt(Notification.EXTRA_PROGRESS, 0);
         r.progressMax = e.getInt(Notification.EXTRA_PROGRESS_MAX, 0);
         r.progressIndeterminate = e.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false);
-        r.silent = n.sound == null && n.vibrate == null && (n.defaults & (Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)) == 0;
-        r.notificationKind = classifyNotification(n, r);
+        r.payloadSilent = n.sound == null && n.vibrate == null
+                && (n.defaults & (Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)) == 0;
+        r.silent = r.payloadSilent;
+        reclassify(r);
         return r;
     }
 
-    private static String classifyNotification(Notification n, EventRecord r) {
-        if (r.fullScreen) return "full_screen";
-        if (r.bubble) return "bubble";
-        if (Notification.CATEGORY_CALL.equals(n.category)) return "call";
-        if (Notification.CATEGORY_ALARM.equals(n.category)) return "alarm";
-        if (Notification.CATEGORY_TRANSPORT.equals(n.category) || (n.extras != null && n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION))) return "media";
-        if (r.progressMax > 0 || r.progressIndeterminate) return "progress";
-        if (r.foregroundService) return "foreground_service";
-        if (Notification.CATEGORY_MESSAGE.equals(n.category)) return "message";
-        if (Notification.CATEGORY_SYSTEM.equals(n.category) || Notification.CATEGORY_STATUS.equals(n.category) || Notification.CATEGORY_SERVICE.equals(n.category)) return "system";
-        if (r.ongoing) return "ongoing";
-        if (r.silent) return "silent";
-        return "standard";
+    public static void reclassify(EventRecord r) {
+        if (r.fullScreen) r.notificationKind = "full_screen";
+        else if (r.bubble) r.notificationKind = "bubble";
+        else if (Notification.CATEGORY_CALL.equals(r.category)) r.notificationKind = "call";
+        else if (Notification.CATEGORY_ALARM.equals(r.category)) r.notificationKind = "alarm";
+        else if (Notification.CATEGORY_TRANSPORT.equals(r.category) || containsMediaSession(r.rawExtras)) r.notificationKind = "media";
+        else if (r.progressMax > 0 || r.progressIndeterminate) r.notificationKind = "progress";
+        else if (r.foregroundService) r.notificationKind = "foreground_service";
+        else if (Notification.CATEGORY_MESSAGE.equals(r.category) || r.conversation) r.notificationKind = "message";
+        else if (Notification.CATEGORY_SYSTEM.equals(r.category)
+                || Notification.CATEGORY_STATUS.equals(r.category)
+                || Notification.CATEGORY_SERVICE.equals(r.category)) r.notificationKind = "system";
+        else if (r.ongoing) r.notificationKind = "ongoing";
+        else if (r.silent) r.notificationKind = "silent";
+        else r.notificationKind = "standard";
+    }
+
+    private static boolean containsMediaSession(String extrasJson) {
+        return extrasJson != null && extrasJson.contains(Notification.EXTRA_MEDIA_SESSION);
     }
 
     private static String cs(CharSequence cs) { return cs == null ? null : cs.toString(); }
+    private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
 
     private static String firstNonEmpty(String... values) {
-        for (String v : values) if (v != null && !v.trim().isEmpty()) return v;
+        for (String v : values) if (!isBlank(v)) return v;
         return null;
     }
 
@@ -123,7 +140,7 @@ public final class NotificationParser {
                     FrameLayout parent = new FrameLayout(packageContext);
                     View v = rv.apply(packageContext, parent);
                     String text = TextUtil.collectText(v);
-                    if (text != null && !text.isBlank()) out.add(text);
+                    if (!isBlank(text)) out.add(text);
                 } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
@@ -194,6 +211,9 @@ public final class NotificationParser {
                 JSONObject o = new JSONObject();
                 o.put("title", a.title == null ? null : a.title.toString());
                 o.put("semanticAction", a.getSemanticAction());
+                o.put("remoteInputCount", a.getRemoteInputs() == null ? 0 : a.getRemoteInputs().length);
+                o.put("contextual", a.isContextual());
+                o.put("authenticationRequired", a.isAuthenticationRequired());
                 out.put(o);
             } catch (Throwable ignored) {}
         }
