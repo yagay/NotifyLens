@@ -5,8 +5,8 @@ import android.app.Notification;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-import com.yagay.NotifyLens.data.EventRecord;
 import com.yagay.NotifyLens.data.CapturePolicy;
+import com.yagay.NotifyLens.data.EventRecord;
 import com.yagay.NotifyLens.data.EventStore;
 import com.yagay.NotifyLens.data.EventTypes;
 import com.yagay.NotifyLens.util.AppInfoUtil;
@@ -39,11 +39,11 @@ public class UiAccessibilityService extends AccessibilityService {
         String type = classify(event, className, sourceClass);
         if (type == null) return;
 
-        String dedupe = pkg + "|" + type + "|" + text;
         long now = System.currentTimeMillis();
+        String dedupe = pkg + "|" + event.getEventType() + "|" + type + "|" + text;
         Long last = recent.put(dedupe, now);
-        if (last != null && now - last < 1500) return;
-        if (recent.size() > 300) recent.entrySet().removeIf(e -> now - e.getValue() > 10_000);
+        if (last != null && now - last < 300L) return;
+        if (recent.size() > 300) recent.entrySet().removeIf(e -> now - e.getValue() > 5_000L);
 
         EventRecord r = new EventRecord();
         r.eventType = type;

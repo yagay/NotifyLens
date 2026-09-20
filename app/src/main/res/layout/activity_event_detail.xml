@@ -10,6 +10,8 @@
             <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textIsSelectable="true" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="完整内容" android:textStyle="bold" />
             <TextView android:id="@+id/full_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:textIsSelectable="true" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="通知更新历史" android:textStyle="bold" />
+            <TextView android:id="@+id/revision_history" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" android:textSize="12sp" android:textIsSelectable="true" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="消息结构" android:textStyle="bold" />
             <TextView android:id="@+id/messages" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" android:textSize="12sp" android:textIsSelectable="true" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="操作按钮" android:textStyle="bold" />

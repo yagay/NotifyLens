@@ -40,7 +40,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.Holder> {
         h.b.title.setVisibility(h.b.title.getText().length() == 0 ? View.GONE : View.VISIBLE);
         h.b.text.setText(nonEmpty(r.fullText, r.text, ""));
         String life = r.removedAt == null ? "" : "  · 已移除 " + TimeFormat.shortTime(r.removedAt);
-        h.b.time.setText(TimeFormat.full(r.postedAt) + "  · " + r.source + life);
+        String revisions = r.revisionCount > 1 ? "  · " + r.revisionCount + " 个版本" : "";
+        h.b.time.setText(TimeFormat.full(r.postedAt) + "  · " + r.source + revisions + life);
         h.itemView.setOnClickListener(v -> {
             Intent i = new Intent(c, EventDetailActivity.class);
             i.putExtra("id", r.id);
@@ -51,22 +52,24 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.Holder> {
     @Override public int getItemCount() { return items.size(); }
 
     private static String typeLabel(EventRecord r) {
+        String base;
         if (EventTypes.NOTIFICATION.equals(r.eventType)) {
             String k = r.notificationKind == null ? "standard" : r.notificationKind;
             switch (k) {
-                case "full_screen": return "全屏通知";
-                case "bubble": return "气泡";
-                case "call": return "来电";
-                case "alarm": return "闹钟";
-                case "media": return "媒体";
-                case "progress": return "进度";
-                case "foreground_service": return "前台服务";
-                case "message": return "消息";
-                case "system": return "系统通知";
-                case "ongoing": return "持续通知";
-                case "silent": return "静默通知";
-                default: return "通知";
+                case "full_screen": base = "全屏通知"; break;
+                case "bubble": base = "气泡"; break;
+                case "call": base = "来电"; break;
+                case "alarm": base = "闹钟"; break;
+                case "media": base = "媒体"; break;
+                case "progress": base = "进度"; break;
+                case "foreground_service": base = "前台服务"; break;
+                case "message": base = "消息"; break;
+                case "system": base = "系统通知"; break;
+                case "ongoing": base = "持续通知"; break;
+                case "silent": base = "静默通知"; break;
+                default: base = "通知"; break;
             }
+            return r.headsUp ? "横幅 · " + base : base;
         }
         switch (r.eventType) {
             case EventTypes.TOAST: return "Toast";

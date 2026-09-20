@@ -48,6 +48,11 @@ jobs:
         with:
           gradle-version: '9.4.1'
 
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain --stacktrace :app:testDebugUnitTest 2>&1 | tee unit-test.log
+
       - name: Build debug
         run: |
           set -o pipefail
@@ -75,6 +80,7 @@ jobs:
             sdk-tools.log
             sdk-packages.log
             sdk-install.log
+            unit-test.log
             debug-build.log
             release-build.log
           if-no-files-found: ignore

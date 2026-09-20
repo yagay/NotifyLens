@@ -8,8 +8,8 @@ import androidx.lifecycle.LiveData;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.yagay.NotifyLens.R;
-import com.yagay.NotifyLens.data.EventRecord;
 import com.yagay.NotifyLens.data.CapturePolicy;
+import com.yagay.NotifyLens.data.EventRecord;
 import com.yagay.NotifyLens.data.EventStore;
 import com.yagay.NotifyLens.data.EventTypes;
 import com.yagay.NotifyLens.data.NotifyDatabase;
@@ -54,7 +54,7 @@ public class AppHistoryActivity extends AppCompatActivity {
                 .setTitle("清空此应用历史？")
                 .setMessage(pkg)
                 .setNegativeButton("取消", null)
-                .setPositiveButton("清空", (d, w) -> EventStore.io().execute(() -> NotifyDatabase.get(this).eventDao().deletePackage(pkg)))
+                .setPositiveButton("清空", (d, w) -> EventStore.deletePackage(this, pkg))
                 .show());
         observe();
     }

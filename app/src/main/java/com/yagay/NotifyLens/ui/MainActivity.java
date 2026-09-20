@@ -13,13 +13,16 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.lifecycle.LiveData;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.yagay.NotifyLens.NotifyLensApp;
 import com.yagay.NotifyLens.R;
 import com.yagay.NotifyLens.data.AppSummary;
 import com.yagay.NotifyLens.data.EventRecord;
 import com.yagay.NotifyLens.data.EventStore;
 import com.yagay.NotifyLens.data.EventTypes;
+import com.yagay.NotifyLens.data.ListenerStateStore;
 import com.yagay.NotifyLens.data.NotifyDatabase;
 import com.yagay.NotifyLens.databinding.ActivityMainBinding;
+import com.yagay.NotifyLens.util.SearchQuery;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,9 +70,9 @@ public class MainActivity extends AppCompatActivity {
         setupRetention();
         b.btnClearAll.setOnClickListener(v -> new AlertDialog.Builder(this)
                 .setTitle("清空全部历史？")
-                .setMessage("此操作不可撤销。")
+                .setMessage("通知版本记录、Toast/弹窗和断连记录也会一起删除。此操作不可撤销。")
                 .setNegativeButton("取消", null)
-                .setPositiveButton("清空", (d, w) -> EventStore.io().execute(() -> NotifyDatabase.get(this).eventDao().deleteAll()))
+                .setPositiveButton("清空", (d, w) -> EventStore.clearAll(this))
                 .show());
 
         renderMode();
@@ -82,13 +85,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updatePermissionStatus() {
-        boolean nl = NotificationManagerCompat.getEnabledListenerPackages(this).contains(getPackageName());
-        b.btnNotificationAccess.setText(nl ? "通知权限 ✓" : "开启通知权限");
+        boolean granted = NotificationManagerCompat.getEnabledListenerPackages(this).contains(getPackageName());
+        boolean connected = ListenerStateStore.isConnected(this);
+        b.btnNotificationAccess.setText(!granted ? "开启通知权限" : connected ? "通知监听 ✓" : "已授权 · 未连接");
+
         String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         boolean a11y = enabled != null && enabled.toLowerCase().contains(getPackageName().toLowerCase());
         b.btnAccessibility.setText(a11y ? "界面提示 ✓" : "开启界面提示");
+
+        long lastEvent = ListenerStateStore.lastEvent(this);
+        long lastConnected = ListenerStateStore.lastConnected(this);
+        StringBuilder status = new StringBuilder();
+        status.append("通知监听：").append(granted ? (connected ? "已连接" : "权限已授予，但当前未连接") : "未授权");
+        if (lastConnected > 0) status.append("\n最后连接：").append(TimeFormat.full(lastConnected));
+        if (lastEvent > 0) status.append("\n最后事件：").append(TimeFormat.full(lastEvent));
+        status.append("\n\n").append(NotifyLensApp.runtimeStatus());
+        b.runtimeStatus.setText(status.toString());
+
         if (mode == R.id.nav_settings) b.captureStatus.setVisibility(View.VISIBLE);
-        else if (mode == R.id.nav_timeline) b.captureStatus.setVisibility((nl && a11y) ? View.GONE : View.VISIBLE);
+        else if (mode == R.id.nav_timeline) b.captureStatus.setVisibility((connected && a11y) ? View.GONE : View.VISIBLE);
         else b.captureStatus.setVisibility(View.GONE);
     }
 
@@ -99,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
         b.list.setVisibility(settings ? View.GONE : View.VISIBLE);
         b.searchBox.setVisibility(settings ? View.GONE : View.VISIBLE);
         b.filterScroll.setVisibility(mode == R.id.nav_timeline ? View.VISIBLE : View.GONE);
+        b.runtimeStatus.setVisibility(settings ? View.VISIBLE : View.GONE);
         updatePermissionStatus();
         if (apps) {
             b.toolbar.setTitle("按应用查看");
@@ -119,9 +135,18 @@ public class MainActivity extends AppCompatActivity {
         if (mode != R.id.nav_timeline) return;
         if (eventSource != null) eventSource.removeObservers(this);
         String q = b.searchEdit.getText() == null ? "" : b.searchEdit.getText().toString().trim();
-        if (!q.isEmpty()) eventSource = NotifyDatabase.get(this).eventDao().search(q);
-        else if ("all".equals(selectedType)) eventSource = NotifyDatabase.get(this).eventDao().observeAll();
-        else eventSource = NotifyDatabase.get(this).eventDao().observeType(selectedType);
+
+        if (!q.isEmpty()) {
+            String fts = SearchQuery.fts(q);
+            eventSource = fts.isEmpty()
+                    ? NotifyDatabase.get(this).eventDao().searchFallback(q)
+                    : NotifyDatabase.get(this).eventFtsDao().search(fts);
+        } else if ("all".equals(selectedType)) {
+            eventSource = NotifyDatabase.get(this).eventDao().observeAll();
+        } else {
+            eventSource = NotifyDatabase.get(this).eventDao().observeType(selectedType);
+        }
+
         eventSource.observe(this, list -> {
             if (q.isEmpty() || "all".equals(selectedType)) eventAdapter.submit(list);
             else {

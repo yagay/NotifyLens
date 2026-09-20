@@ -54,7 +54,12 @@
     <LinearLayout
         android:id="@+id/settings_panel" android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:orientation="vertical" android:padding="16dp" android:visibility="gone">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="历史保留时间" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="运行状态" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+        <TextView android:id="@+id/runtime_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:textIsSelectable="true" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20dp"
+            android:text="历史保留时间" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
         <RadioGroup android:id="@+id/retention_group" android:layout_width="match_parent" android:layout_height="wrap_content">
             <RadioButton android:id="@+id/retention_7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="7 天" />
             <RadioButton android:id="@+id/retention_30" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="30 天" />
@@ -66,8 +71,7 @@
             android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp"
             android:text="清空全部历史" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp"
-            android:text="LSPosed 增强模式
-启用模块并选择目标 App 后，可额外记录 Toast、Dialog、PopupWindow、Snackbar。通知栏历史本身不依赖 LSPosed。"
+            android:text="LSPosed 增强模式使用 API 102 Remote Preferences 做配置与 HMAC 鉴权。SystemUI 作用域可记录实际 Heads-up；选择其他目标 App 可增强 Toast、Dialog、PopupWindow、Snackbar。"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
     </LinearLayout>
 
