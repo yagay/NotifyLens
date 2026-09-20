@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_notifylens"
+        android:label="NotifyLens"
+        android:description="@string/xposed_description"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.NotifyLens">
+
+        <activity
+            android:name=".ui.EventDetailActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.AppHistoryActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".collector.NotificationCaptureService"
+            android:label="NotifyLens 通知监听"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".collector.UiAccessibilityService"
+            android:label="NotifyLens 界面提示采集"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <receiver
+            android:name=".collector.XposedEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.yagay.NotifyLens.XPOSED_EVENT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
