@@ -24,7 +24,7 @@ public abstract class NotifyDatabase extends RoomDatabase {
                     INSTANCE = Room.databaseBuilder(
                                     app,
                                     NotifyDatabase.class,
-                                    app.getDatabasePath("notifylens.db").getAbsolutePath())
+                                    "notifylens.db")
                             .openHelperFactory(factory)
                             .fallbackToDestructiveMigration()
                             .build();
