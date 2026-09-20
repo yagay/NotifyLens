@@ -40,9 +40,13 @@ public final class NotificationParser {
         r.updatedAt = System.currentTimeMillis();
         r.eventKey = r.notificationKey + "@" + r.postedAt;
 
-        r.title = cs(e.getCharSequence(Notification.EXTRA_TITLE));
+        r.title = firstNonEmpty(
+                cs(e.getCharSequence(Notification.EXTRA_TITLE_BIG)),
+                cs(e.getCharSequence(Notification.EXTRA_TITLE)));
         r.text = cs(e.getCharSequence(Notification.EXTRA_TEXT));
-        r.subText = cs(e.getCharSequence(Notification.EXTRA_SUB_TEXT));
+        r.subText = firstNonEmpty(
+                cs(e.getCharSequence(Notification.EXTRA_SUB_TEXT)),
+                cs(e.getCharSequence(Notification.EXTRA_INFO_TEXT)));
         r.summaryText = cs(e.getCharSequence(Notification.EXTRA_SUMMARY_TEXT));
 
         String bigText = cs(e.getCharSequence(Notification.EXTRA_BIG_TEXT));
@@ -134,10 +138,16 @@ public final class NotificationParser {
     }
 
     private static String messagesToText(Bundle extras) {
+        List<String> out = new ArrayList<>();
+        appendMessagesText(extras, Notification.EXTRA_MESSAGES, out);
+        appendMessagesText(extras, Notification.EXTRA_HISTORIC_MESSAGES, out);
+        return out.isEmpty() ? null : String.join("\n", out);
+    }
+
+    private static void appendMessagesText(Bundle extras, String key, List<String> out) {
         try {
-            Parcelable[] arr = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
-            if (arr == null) return null;
-            List<String> out = new ArrayList<>();
+            Parcelable[] arr = extras.getParcelableArray(key);
+            if (arr == null) return;
             for (Parcelable p : arr) {
                 if (!(p instanceof Bundle)) continue;
                 Bundle b = (Bundle) p;
@@ -147,15 +157,20 @@ public final class NotificationParser {
                 if (person != null && person.getName() != null) sender = person.getName().toString();
                 if (text != null) out.add((sender == null || sender.isEmpty()) ? text : sender + ": " + text);
             }
-            return out.isEmpty() ? null : String.join("\n", out);
-        } catch (Throwable ignored) { return null; }
+        } catch (Throwable ignored) {}
     }
 
     private static String messagesToJson(Bundle extras) {
         JSONArray out = new JSONArray();
+        appendMessagesJson(extras, Notification.EXTRA_MESSAGES, false, out);
+        appendMessagesJson(extras, Notification.EXTRA_HISTORIC_MESSAGES, true, out);
+        return out.toString();
+    }
+
+    private static void appendMessagesJson(Bundle extras, String key, boolean historic, JSONArray out) {
         try {
-            Parcelable[] arr = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
-            if (arr == null) return out.toString();
+            Parcelable[] arr = extras.getParcelableArray(key);
+            if (arr == null) return;
             for (Parcelable p : arr) {
                 if (!(p instanceof Bundle)) continue;
                 Bundle b = (Bundle) p;
@@ -163,12 +178,12 @@ public final class NotificationParser {
                 o.put("text", cs(b.getCharSequence("text")));
                 o.put("sender", cs(b.getCharSequence("sender")));
                 o.put("time", b.getLong("time", 0L));
+                o.put("historic", historic);
                 Person person = (Person) b.getParcelable("sender_person");
                 if (person != null) o.put("person", person.getName());
                 out.put(o);
             }
         } catch (Throwable ignored) {}
-        return out.toString();
     }
 
     private static JSONArray actionsToJson(Notification n) {
