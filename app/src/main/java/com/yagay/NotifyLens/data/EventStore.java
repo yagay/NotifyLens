@@ -10,7 +10,24 @@ public final class EventStore {
     private EventStore() {}
 
     public static void save(Context context, EventRecord record) {
-        IO.execute(() -> NotifyDatabase.get(context).eventDao().upsert(record));
+        IO.execute(() -> {
+            EventDao dao = NotifyDatabase.get(context).eventDao();
+            if (!EventTypes.NOTIFICATION.equals(record.eventType)) {
+                String text = record.fullText != null ? record.fullText : record.text;
+                if (text != null && !text.isBlank()) {
+                    EventRecord existing = dao.recentEquivalent(
+                            record.packageName, record.eventType, text, record.postedAt - 2_000L);
+                    if (existing != null) {
+                        existing.updatedAt = Math.max(existing.updatedAt, record.updatedAt);
+                        if ("lsposed".equals(record.source)) existing.source = "lsposed";
+                        if (record.className != null && !record.className.isBlank()) existing.className = record.className;
+                        dao.update(existing);
+                        return;
+                    }
+                }
+            }
+            dao.upsert(record);
+        });
     }
 
     public static void markRemoved(Context context, String notificationKey, long when) {
