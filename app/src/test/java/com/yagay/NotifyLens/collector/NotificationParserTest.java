@@ -3,7 +3,6 @@ package com.yagay.NotifyLens.collector;
 import android.app.Application;
 import android.app.Notification;
 import android.app.Person;
-import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
 
 import androidx.test.core.app.ApplicationProvider;
@@ -54,6 +53,6 @@ public class NotificationParserTest {
     private StatusBarNotification sbn(Notification n, long when) {
         return new StatusBarNotification(
                 "com.example.test", "com.example.test", 7, null,
-                10001, 1234, n, UserHandle.of(0), null, when);
+                10001, 1234, n, android.os.Process.myUserHandle(), null, when);
     }
 }
