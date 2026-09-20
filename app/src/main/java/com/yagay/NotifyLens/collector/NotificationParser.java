@@ -179,7 +179,6 @@ public final class NotificationParser {
                 JSONObject o = new JSONObject();
                 o.put("title", a.title == null ? null : a.title.toString());
                 o.put("semanticAction", a.getSemanticAction());
-                o.put("showsUserInterface", a.getShowsUserInterface());
                 out.put(o);
             } catch (Throwable ignored) {}
         }
