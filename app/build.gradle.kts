@@ -4,7 +4,9 @@ plugins {
 
 android {
     namespace = "com.yagay.NotifyLens"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 0 }
+    }
 
     defaultConfig {
         applicationId = "com.yagay.NotifyLens"
@@ -17,6 +19,12 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+
+    packaging.resources.merges += "META-INF/xposed/*"
+
+    sourceSets {
+        getByName("main") { resources.srcDirs("src/main/resources") }
     }
 
     buildTypes {
