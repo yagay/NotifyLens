@@ -41,6 +41,9 @@ public interface EventDao {
     @Query("SELECT * FROM events WHERE notification_key = :key ORDER BY posted_at DESC LIMIT 1")
     EventRecord latestByNotificationKey(String key);
 
+    @Query("SELECT * FROM events WHERE package_name = :packageName AND event_type = :type AND posted_at >= :cutoff AND (full_text = :text OR text = :text) ORDER BY posted_at DESC LIMIT 1")
+    EventRecord recentEquivalent(String packageName, String type, String text, long cutoff);
+
     @Query("DELETE FROM events WHERE package_name = :packageName")
     void deletePackage(String packageName);
 
