@@ -55,7 +55,7 @@ public final class NotifyLensModule extends XposedModule {
             if ("com.android.systemui".equals(pkg)) {
                 installHeadsUpHooks(param.getClassLoader());
             }
-            markHeartbeat(param.getProcessName(), pkg);
+            markHeartbeat(currentProcessName(), pkg);
             log(Log.INFO, TAG, "enhanced capture ready: " + pkg);
         } catch (Throwable t) {
             log(Log.ERROR, TAG, "hook setup failed: " + pkg, t);
@@ -270,6 +270,11 @@ public final class NotifyLensModule extends XposedModule {
             Object value = m.invoke(entry);
             return value == null ? null : value.toString();
         } catch (Throwable ignored) { return null; }
+    }
+
+    private static String currentProcessName() {
+        try { return android.app.Application.getProcessName(); }
+        catch (Throwable ignored) { return ""; }
     }
 
     private static Context currentApplicationContext() {
