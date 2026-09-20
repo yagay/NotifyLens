@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:title="NotifyLens" app:titleCentered="false" />
+
+    <LinearLayout
+        android:id="@+id/capture_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:paddingHorizontal="12dp" android:paddingVertical="6dp">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_notification_access" style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="通知权限" android:textSize="12sp" />
+        <Space android:layout_width="8dp" android:layout_height="1dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_accessibility" style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="界面提示" android:textSize="12sp" />
+    </LinearLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/search_box" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp" android:hint="搜索应用、标题、内容或包名"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/search_edit" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:singleLine="true" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/filter_scroll" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:scrollbars="none">
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:paddingHorizontal="12dp" android:paddingVertical="6dp" app:singleSelection="true"
+            app:selectionRequired="true">
+            <com.google.android.material.chip.Chip android:id="@+id/chip_all" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="全部" android:checked="true" />
+            <com.google.android.material.chip.Chip android:id="@+id/chip_notification" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="通知" />
+            <com.google.android.material.chip.Chip android:id="@+id/chip_toast" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Toast" />
+            <com.google.android.material.chip.Chip android:id="@+id/chip_dialog" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="弹窗" />
+            <com.google.android.material.chip.Chip android:id="@+id/chip_popup" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Popup" />
+            <com.google.android.material.chip.Chip android:id="@+id/chip_snackbar" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Snackbar" />
+        </com.google.android.material.chip.ChipGroup>
+    </HorizontalScrollView>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:clipToPadding="false" android:paddingBottom="12dp" />
+
+    <LinearLayout
+        android:id="@+id/settings_panel" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical" android:padding="16dp" android:visibility="gone">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="历史保留时间" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+        <RadioGroup android:id="@+id/retention_group" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <RadioButton android:id="@+id/retention_7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="7 天" />
+            <RadioButton android:id="@+id/retention_30" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="30 天" />
+            <RadioButton android:id="@+id/retention_90" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="90 天" />
+            <RadioButton android:id="@+id/retention_forever" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="永久" />
+        </RadioGroup>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_all" style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp"
+            android:text="清空全部历史" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp"
+            android:text="LSPosed 增强模式
+启用模块并选择目标 App 后，可额外记录 Toast、Dialog、PopupWindow、Snackbar。通知栏历史本身不依赖 LSPosed。"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+    </LinearLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav" android:layout_width="match_parent" android:layout_height="wrap_content"
+        app:menu="@menu/bottom_nav" />
+</LinearLayout>
