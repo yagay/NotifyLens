@@ -12,7 +12,11 @@ import com.yagay.NotifyLens.collector.XposedEventReceiver;
 import com.yagay.NotifyLens.data.EventTypes;
 import com.yagay.NotifyLens.util.TextUtil;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
@@ -20,6 +24,8 @@ import io.github.libxposed.api.XposedModuleInterface;
 
 public final class NotifyLensModule extends XposedModule {
     private static final String TAG = "NotifyLens-Xposed";
+    private static final Map<Object, PendingUiEvent> PENDING =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     @Override
     public void onModuleLoaded(XposedModuleInterface.ModuleLoadedParam param) {
@@ -44,7 +50,26 @@ public final class NotifyLensModule extends XposedModule {
             Context context = argContext(chain);
             String text = textArg(context, chain);
             Object result = chain.proceed();
-            emit(context, pkg, EventTypes.TOAST, text, Toast.class.getName());
+            if (result instanceof Toast && context != null && text != null && !text.isBlank()) {
+                PENDING.put(result, new PendingUiEvent(context, EventTypes.TOAST, text, Toast.class.getName()));
+            }
+            return result;
+        });
+
+        hookNamed(Toast.class, "show", chain -> {
+            Object self = chain.getThisObject();
+            Object result = chain.proceed();
+            if (self instanceof Toast) {
+                PendingUiEvent pending = PENDING.remove(self);
+                if (pending != null) {
+                    emit(pending.context, pkg, pending.type, pending.text, pending.className);
+                } else {
+                    Toast toast = (Toast) self;
+                    Context context = reflectToastContext(toast);
+                    String text = toastText(toast);
+                    emit(context, pkg, EventTypes.TOAST, text, toast.getClass().getName());
+                }
+            }
             return result;
         });
 
@@ -85,11 +110,20 @@ public final class NotifyLensModule extends XposedModule {
                     if (arg instanceof CharSequence) text = arg.toString();
                 }
                 Object result = chain.proceed();
-                emit(context, pkg, EventTypes.SNACKBAR, text, snackbar.getName());
+                if (result != null && context != null && text != null && !text.isBlank()) {
+                    PENDING.put(result, new PendingUiEvent(context, EventTypes.SNACKBAR, text, snackbar.getName()));
+                }
+                return result;
+            });
+            hookNamed(snackbar, "show", chain -> {
+                Object self = chain.getThisObject();
+                Object result = chain.proceed();
+                PendingUiEvent pending = self == null ? null : PENDING.remove(self);
+                if (pending != null) emit(pending.context, pkg, pending.type, pending.text, pending.className);
                 return result;
             });
         } catch (Throwable ignored) {
-            // App does not use Material Snackbar.
+            // Target app does not use Material Snackbar.
         }
     }
 
@@ -99,8 +133,8 @@ public final class NotifyLensModule extends XposedModule {
             try {
                 m.setAccessible(true);
                 hook(m)
-                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                    .intercept(hooker);
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept(hooker);
             } catch (Throwable t) {
                 log(Log.WARN, TAG, "skip " + clazz.getName() + "#" + name + ": " + t);
             }
@@ -113,13 +147,38 @@ public final class NotifyLensModule extends XposedModule {
     }
 
     private static String textArg(Context context, XposedInterface.Chain chain) {
-        for (Object arg : chain.getArgs()) {
-            if (arg instanceof CharSequence) return arg.toString();
-        }
+        for (Object arg : chain.getArgs()) if (arg instanceof CharSequence) return arg.toString();
         if (context != null && chain.getArgs().size() > 1 && chain.getArg(1) instanceof Integer) {
             try { return context.getText((Integer) chain.getArg(1)).toString(); } catch (Throwable ignored) {}
         }
         return null;
+    }
+
+    private static Context reflectToastContext(Toast toast) {
+        try {
+            Field f = Toast.class.getDeclaredField("mContext");
+            f.setAccessible(true);
+            Object value = f.get(toast);
+            return value instanceof Context ? (Context) value : null;
+        } catch (Throwable ignored) { return null; }
+    }
+
+    private static String toastText(Toast toast) {
+        try {
+            Method getView = Toast.class.getDeclaredMethod("getView");
+            getView.setAccessible(true);
+            Object value = getView.invoke(toast);
+            if (value instanceof View) {
+                String text = TextUtil.collectText((View) value);
+                if (text != null && !text.isBlank()) return text;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            Field text = Toast.class.getDeclaredField("mText");
+            text.setAccessible(true);
+            Object value = text.get(toast);
+            return value instanceof CharSequence ? value.toString() : null;
+        } catch (Throwable ignored) { return null; }
     }
 
     private static void emit(Context context, String pkg, String type, String text, String className) {
@@ -134,5 +193,19 @@ public final class NotifyLensModule extends XposedModule {
             i.putExtra("time", System.currentTimeMillis());
             context.sendBroadcast(i);
         } catch (Throwable ignored) {}
+    }
+
+    private static final class PendingUiEvent {
+        final Context context;
+        final String type;
+        final String text;
+        final String className;
+
+        PendingUiEvent(Context context, String type, String text, String className) {
+            this.context = context.getApplicationContext();
+            this.type = type;
+            this.text = text;
+            this.className = className;
+        }
     }
 }
