@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
+        android:name=".NotifyLensApp"
         android:allowBackup="false"
         android:icon="@drawable/ic_notifylens"
         android:label="NotifyLens"
@@ -53,10 +54,6 @@
 
         <receiver
             android:name=".collector.XposedEventReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.yagay.NotifyLens.XPOSED_EVENT" />
-            </intent-filter>
-        </receiver>
+            android:exported="true" />
     </application>
 </manifest>

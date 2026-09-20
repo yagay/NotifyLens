@@ -11,11 +11,14 @@ import java.util.List;
 
 @Dao
 public interface EventDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    long upsert(EventRecord record);
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    long insert(EventRecord record);
 
     @Update
     void update(EventRecord record);
+
+    @Query("SELECT * FROM events WHERE event_key = :key LIMIT 1")
+    EventRecord byEventKey(String key);
 
     @Query("SELECT * FROM events ORDER BY posted_at DESC LIMIT 1000")
     LiveData<List<EventRecord>> observeAll();
@@ -30,7 +33,7 @@ public interface EventDao {
     LiveData<List<EventRecord>> observePackageType(String packageName, String type);
 
     @Query("SELECT * FROM events WHERE (app_label LIKE '%' || :q || '%' OR package_name LIKE '%' || :q || '%' OR title LIKE '%' || :q || '%' OR text LIKE '%' || :q || '%' OR full_text LIKE '%' || :q || '%') ORDER BY posted_at DESC LIMIT 1000")
-    LiveData<List<EventRecord>> search(String q);
+    LiveData<List<EventRecord>> searchFallback(String q);
 
     @Query("SELECT package_name, MAX(app_label) AS app_label, COUNT(*) AS event_count, MAX(posted_at) AS last_time FROM events GROUP BY package_name ORDER BY last_time DESC")
     LiveData<List<AppSummary>> observeApps();
@@ -38,11 +41,11 @@ public interface EventDao {
     @Query("SELECT * FROM events WHERE id = :id LIMIT 1")
     EventRecord byId(long id);
 
-    @Query("SELECT * FROM events WHERE notification_key = :key ORDER BY posted_at DESC LIMIT 1")
+    @Query("SELECT * FROM events WHERE notification_key = :key ORDER BY updated_at DESC LIMIT 1")
     EventRecord latestByNotificationKey(String key);
 
-    @Query("SELECT * FROM events WHERE package_name = :packageName AND event_type = :type AND posted_at >= :cutoff AND (full_text = :text OR text = :text) ORDER BY posted_at DESC LIMIT 1")
-    EventRecord recentEquivalent(String packageName, String type, String text, long cutoff);
+    @Query("SELECT * FROM events WHERE package_name = :packageName AND event_type = :type AND source != :source AND posted_at >= :cutoff AND (full_text = :text OR text = :text) ORDER BY posted_at DESC LIMIT 1")
+    EventRecord recentEquivalentFromOtherSource(String packageName, String type, String text, String source, long cutoff);
 
     @Query("DELETE FROM events WHERE package_name = :packageName")
     void deletePackage(String packageName);

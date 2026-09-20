@@ -12,13 +12,19 @@ android {
         applicationId = "com.yagay.NotifyLens"
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
 
     packaging.resources.merges += "META-INF/xposed/*"
@@ -49,6 +55,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime:2.9.2")
     implementation("androidx.room:room-runtime:2.7.2")
     implementation("net.zetetic:sqlcipher-android:4.19.0")
+    implementation("io.github.libxposed:service:102.0.0")
     annotationProcessor("androidx.room:room-compiler:2.7.2")
     compileOnly("io.github.libxposed:api:102.0.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.15.1")
+    testImplementation("androidx.test:core:1.7.0")
 }

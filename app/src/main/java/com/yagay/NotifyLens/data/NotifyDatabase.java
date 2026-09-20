@@ -8,10 +8,23 @@ import androidx.room.RoomDatabase;
 
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory;
 
-@Database(entities = {EventRecord.class}, version = 1, exportSchema = false)
+@Database(
+        entities = {
+                EventRecord.class,
+                EventFts.class,
+                NotificationInstance.class,
+                NotificationRevision.class,
+                CaptureGap.class
+        },
+        version = 2,
+        exportSchema = false
+)
 public abstract class NotifyDatabase extends RoomDatabase {
     private static volatile NotifyDatabase INSTANCE;
+
     public abstract EventDao eventDao();
+    public abstract EventFtsDao eventFtsDao();
+    public abstract HistoryDao historyDao();
 
     public static NotifyDatabase get(Context context) {
         if (INSTANCE == null) {
@@ -21,13 +34,16 @@ public abstract class NotifyDatabase extends RoomDatabase {
                     System.loadLibrary("sqlcipher");
                     byte[] passphrase = DbKeyManager.getOrCreate(app);
                     SupportOpenHelperFactory factory = new SupportOpenHelperFactory(passphrase);
-                    INSTANCE = Room.databaseBuilder(
-                                    app,
-                                    NotifyDatabase.class,
-                                    "notifylens.db")
+                    INSTANCE = Room.databaseBuilder(app, NotifyDatabase.class, "notifylens.db")
                             .openHelperFactory(factory)
-                            .fallbackToDestructiveMigration()
+                            .addMigrations(DatabaseMigrations.MIGRATION_1_2)
                             .build();
+                    EventStore.io().execute(() -> {
+                        try {
+                            INSTANCE.eventFtsDao().backfillMissing();
+                            INSTANCE.eventFtsDao().prune();
+                        } catch (Throwable ignored) {}
+                    });
                 }
             }
         }
