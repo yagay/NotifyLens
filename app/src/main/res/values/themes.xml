@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.NotifyLens" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryContainer">#DFE5FF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+    </style>
+</resources>

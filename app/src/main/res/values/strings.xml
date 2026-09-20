@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NotifyLens</string>
+    <string name="xposed_description">通知、Toast 与界面提示历史中心</string>
+    <string name="accessibility_desc">记录 Toast、Dialog、Snackbar、PopupWindow 等短暂界面提示。不会主动操作界面。</string>
+</resources>
