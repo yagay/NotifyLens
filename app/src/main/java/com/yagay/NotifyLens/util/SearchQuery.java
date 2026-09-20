@@ -8,7 +8,7 @@ public final class SearchQuery {
         String[] parts = input.trim().split("\\s+");
         StringBuilder out = new StringBuilder();
         for (String part : parts) {
-            String clean = part.replace(""", "").replace("*", "").trim();
+            String clean = part.replace('"', ' ').replace("*", "").trim();
             if (clean.isEmpty()) continue;
             if (out.length() > 0) out.append(" AND ");
             out.append('"').append(clean).append('"').append('*');
