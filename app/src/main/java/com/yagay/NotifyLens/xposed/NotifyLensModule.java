@@ -12,7 +12,6 @@ import com.yagay.NotifyLens.collector.XposedEventReceiver;
 import com.yagay.NotifyLens.data.EventTypes;
 import com.yagay.NotifyLens.util.TextUtil;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
@@ -65,9 +64,9 @@ public final class NotifyLensModule extends XposedModule {
                     emit(pending.context, pkg, pending.type, pending.text, pending.className);
                 } else {
                     Toast toast = (Toast) self;
-                    Context context = reflectToastContext(toast);
-                    String text = toastText(toast);
-                    emit(context, pkg, EventTypes.TOAST, text, toast.getClass().getName());
+                    View view = toast.getView();
+                    emit(view == null ? null : view.getContext(), pkg, EventTypes.TOAST,
+                            TextUtil.collectText(view), toast.getClass().getName());
                 }
             }
             return result;
@@ -152,33 +151,6 @@ public final class NotifyLensModule extends XposedModule {
             try { return context.getText((Integer) chain.getArg(1)).toString(); } catch (Throwable ignored) {}
         }
         return null;
-    }
-
-    private static Context reflectToastContext(Toast toast) {
-        try {
-            Field f = Toast.class.getDeclaredField("mContext");
-            f.setAccessible(true);
-            Object value = f.get(toast);
-            return value instanceof Context ? (Context) value : null;
-        } catch (Throwable ignored) { return null; }
-    }
-
-    private static String toastText(Toast toast) {
-        try {
-            Method getView = Toast.class.getDeclaredMethod("getView");
-            getView.setAccessible(true);
-            Object value = getView.invoke(toast);
-            if (value instanceof View) {
-                String text = TextUtil.collectText((View) value);
-                if (text != null && !text.isBlank()) return text;
-            }
-        } catch (Throwable ignored) {}
-        try {
-            Field text = Toast.class.getDeclaredField("mText");
-            text.setAccessible(true);
-            Object value = text.get(toast);
-            return value instanceof CharSequence ? value.toString() : null;
-        } catch (Throwable ignored) { return null; }
     }
 
     private static void emit(Context context, String pkg, String type, String text, String className) {
