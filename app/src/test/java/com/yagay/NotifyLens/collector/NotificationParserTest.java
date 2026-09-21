@@ -53,6 +53,6 @@ public class NotificationParserTest {
     private StatusBarNotification sbn(Notification n, long when) {
         return new StatusBarNotification(
                 "com.example.test", "com.example.test", 7, null,
-                10001, 1234, n, android.os.Process.myUserHandle(), null, when);
+                10001, 1234, 0, n, android.os.Process.myUserHandle(), when);
     }
 }
