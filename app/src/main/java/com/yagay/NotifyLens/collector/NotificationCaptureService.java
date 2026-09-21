@@ -52,7 +52,10 @@ public class NotificationCaptureService extends NotificationListenerService {
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn, RankingMap rankingMap, int reason) {
         ListenerStateStore.markEvent(this);
-        if (sbn != null) EventStore.markRemoved(this, sbn.getKey(), System.currentTimeMillis(), reason);
+        if (sbn == null) return;
+        long when = System.currentTimeMillis();
+        String key = sbn.getKey();
+        CAPTURE.execute(() -> EventStore.markRemovedBlocking(this, key, when, reason));
     }
 
     @Override
