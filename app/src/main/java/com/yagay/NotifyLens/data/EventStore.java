@@ -54,10 +54,16 @@ public final class EventStore {
             incoming.contentHash = ContentHasher.hash(incoming);
         }
 
-        NotificationInstance instance = history.instanceByKey(incoming.eventKey);
+        NotificationInstance instance = incoming.notificationKey == null
+                ? null
+                : history.activeInstanceByNotificationKey(incoming.notificationKey);
+
         if (instance == null) {
             instance = new NotificationInstance();
-            instance.instanceKey = incoming.eventKey;
+            String baseKey = incoming.notificationKey == null || incoming.notificationKey.isBlank()
+                    ? incoming.eventKey
+                    : "notification:" + incoming.notificationKey + "@" + incoming.postedAt;
+            instance.instanceKey = baseKey;
             instance.notificationKey = incoming.notificationKey;
             instance.packageName = incoming.packageName;
             instance.firstSeen = incoming.postedAt;
@@ -66,6 +72,9 @@ public final class EventStore {
             instance.currentRevision = 0;
             instance.id = history.insertInstance(instance);
         } else {
+            // Same live notification: keep one timeline row and only append revisions.
+            incoming.eventKey = instance.instanceKey;
+            incoming.postedAt = instance.firstSeen;
             instance.lastSeen = Math.max(instance.lastSeen, incoming.updatedAt);
             instance.channelId = incoming.channelId;
         }
@@ -98,8 +107,10 @@ public final class EventStore {
             incoming.id = dao.insert(incoming);
         } else {
             incoming.id = existing.id;
-            incoming.removedAt = existing.removedAt;
-            incoming.removalReason = existing.removalReason;
+            incoming.postedAt = existing.postedAt;
+            // An active update must not resurrect an old removed state.
+            incoming.removedAt = null;
+            incoming.removalReason = 0;
             incoming.headsUp = incoming.headsUp || existing.headsUp;
             dao.update(incoming);
         }
@@ -107,25 +118,28 @@ public final class EventStore {
     }
 
     public static void markRemoved(Context context, String notificationKey, long when, int reason) {
-        IO.execute(() -> {
-            NotifyDatabase db = NotifyDatabase.get(context);
-            EventDao dao = db.eventDao();
-            EventRecord r = dao.latestByNotificationKey(notificationKey);
-            if (r != null) {
-                r.removedAt = when;
-                r.removalReason = reason;
-                r.updatedAt = Math.max(r.updatedAt, when);
-                dao.update(r);
-                syncFts(db, r);
-            }
-            NotificationInstance instance = db.historyDao().latestInstanceByNotificationKey(notificationKey);
-            if (instance != null) {
-                instance.removedAt = when;
-                instance.removalReason = reason;
-                instance.lastSeen = Math.max(instance.lastSeen, when);
-                db.historyDao().updateInstance(instance);
-            }
-        });
+        IO.execute(() -> markRemovedBlocking(context.getApplicationContext(), notificationKey, when, reason));
+    }
+
+    public static void markRemovedBlocking(Context context, String notificationKey, long when, int reason) {
+        if (notificationKey == null) return;
+        NotifyDatabase db = NotifyDatabase.get(context);
+        EventDao dao = db.eventDao();
+        EventRecord r = dao.latestByNotificationKey(notificationKey);
+        if (r != null && r.removedAt == null) {
+            r.removedAt = when;
+            r.removalReason = reason;
+            r.updatedAt = Math.max(r.updatedAt, when);
+            dao.update(r);
+            syncFts(db, r);
+        }
+        NotificationInstance instance = db.historyDao().activeInstanceByNotificationKey(notificationKey);
+        if (instance != null) {
+            instance.removedAt = when;
+            instance.removalReason = reason;
+            instance.lastSeen = Math.max(instance.lastSeen, when);
+            db.historyDao().updateInstance(instance);
+        }
     }
 
     public static void markHeadsUp(Context context, String notificationKey, long when) {
