@@ -19,6 +19,9 @@ public interface HistoryDao {
     @Query("SELECT * FROM notification_instances WHERE instance_key = :key LIMIT 1")
     NotificationInstance instanceByKey(String key);
 
+    @Query("SELECT * FROM notification_instances WHERE notification_key = :key AND removed_at IS NULL ORDER BY last_seen DESC LIMIT 1")
+    NotificationInstance activeInstanceByNotificationKey(String key);
+
     @Query("SELECT * FROM notification_instances WHERE notification_key = :key ORDER BY last_seen DESC LIMIT 1")
     NotificationInstance latestInstanceByNotificationKey(String key);
 
